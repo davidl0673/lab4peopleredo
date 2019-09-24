@@ -1,104 +1,42 @@
+  
 const express = require("express");
-const mongoose = require("mongoose");
 const morgan = require("morgan");
 const cors = require("cors");
+const mongoose = require("mongoose");
 
-const Person = require("./models/Person");
+
+const UserRouter = require("./routes/user.routes");
 
 const app = express();
 
-const { AsyncRouter } = require("express-async-router");
-const { check, validationResult } = require("express-validator");
+app.use(cors());
+app.use(morgan("tiny"));
+app.use(express.json());
 
-const jwtMiddleware = require("../helpers/jwt-middleware");
-const Board = require("../models/Board");
-
-const router = AsyncRouter();
-const createValidators = [
-  check("name").exists(),
-  check("user").exists()
-];
-const updateValidators = [
-  check("name").exists(),
-];
-
-// Le de LCRUD
-router.get("/", async (req, res) => {
-  const boards = await Board.find();
-
-  res.send(boards);
+app.get("/", (req, res) => {
+  res.send("stuff and things");
 });
 
-// Cre de LCRUD
-router.post("/", [...createValidators, jwtMiddleware], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(422).send({ errors: errors.array() });
-  }
+app.use("/users", UserRouter);
 
-  const { name, user } = req.body;
+const connectDatabase = async () => {
+  const database = await mongoose.connect('mongodb://localhost/test', {
+    useNewUrlParser: true,
+    useCreateIndex: true,
+    useFindAndModify: true,
+    useUnifiedTopology: true
+  });
 
-  const board = new Board({ name, user });
-  await board.save();
+  console.log("Connected to database...");
 
-  res.status(201).send(board);
-});
+  return database;
+}
 
-// Le re de LCRUD
-router.get("/:_id", async (req, res) => {
-  const { _id } = req.params;
-  const board = await Board.findOne({ _id }).populate(["posts", "user"]);
+const startServer = (port=8000) => {
+  app.listen(port, async () => {
+    await connectDatabase();
+    console.log(`Listening @ localhost:${port}...`);
+  });
+}
 
-  if(!board) return res.sendStatus(404);
-
-  res.send(board);
-});
-
-// update 
-router.patch("/:_id", [...updateValidators, jwtMiddleware], async (req, res) => {
-  const { _id } = req.params;
-  const board = await Board.findOne({ _id });
-
-  if(!board) return res.sendStatus(404);
-  if(req.user._id !== board.user._id) return res.sendStatus(401);
-
-  board.name = req.body.name;
-  await board.save();
-
-  res.send(board);
-});
-
-// Le delete
-router.delete("/:_id", jwtMiddleware, async (req, res) => {
-  const { _id } = req.params;
-  const board = await Board.findOne({ _id });
-  
-  if(!board) return res.sendStatus(404);
-  if(req.user._id !== board.user._id) return res.sendStatus(401);
-
-  await board.remove();
-
-  res.send(board);
-});
-
-module.exports = router;
-
-
-const startServer = async () => {
-    try {
-      await mongoose.connect("mongodb://localhost/mongoose-example", {
-        useNewUrlParser: true, // Avoid annoying deprecation error!
-      })
-      console.log("Connected to DB...");
-    } catch(err) {
-      console.error(`Failed to connect to MongoDB: ${err}`);
-      // Tells other programs that this failed
-      process.exit(-1);
-    }
-  
-    app.listen(8000, () => {
-      console.log("Listening at localhost:8000...");
-    });
-  }
-  
-  startServer();
+startServer();
