@@ -39,4 +39,8 @@ const startServer = (port=8000) => {
   });
 }
 
-startServer();
+module.exports = {
+   connectDatabase,
+   startServer,
+   app
+}
